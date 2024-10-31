@@ -4,11 +4,16 @@ import logging
 from concurrent.futures import ThreadPoolExecutor
 import json 
 import time
+import login
 # 配置日志
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # 读取配置文件
-token =  # 请填写你的token
+loginName = input("请输入用户名：")
+passWord = input("请输入密码：")
+
+token = login.login(loginName, passWord)
+
 headers = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/95.0.4638.69 Safari/537.36',
     'token': token,
