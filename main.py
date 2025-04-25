@@ -25,7 +25,7 @@ session = requests.Session()
 
 # 获取完成情况
 def get_course_user_statistic(token):
-    url = f"https://www.baomi.org.cn/portal/main-api/v2/coursePacket/getCourseUserStatistic?coursePacketId=78e6a04c-dd87-4794-8214-9de32be7cae1&token={token}"
+    url = f"https://www.baomi.org.cn/portal/main-api/v2/coursePacket/getCourseUserStatistic?coursePacketId=21c7d935-dd53-49d2-a95f-dc0f3e14ced7&token={token}"
     response = requests.get(url).json()
     gradeSum = response['data']['gradeSum']
     totalGrade = response['data']['totalGrade']
@@ -119,7 +119,7 @@ def process_video(course_packet_id, directory_id):
         logging.error(f"处理视频失败: {e}")
 
 if __name__ == '__main__':
-    course_packet_id = '78e6a04c-dd87-4794-8214-9de32be7cae1'  # 2024年度保密教育线上培训 课程参数
+    course_packet_id = '21c7d935-dd53-49d2-a95f-dc0f3e14ced7'  # 2025年度保密教育线上培训 课程参数
     timestamp = int(time.time())
 
     try:
