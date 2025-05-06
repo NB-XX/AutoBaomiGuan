@@ -5,6 +5,8 @@ from concurrent.futures import ThreadPoolExecutor
 import json 
 import time
 import login
+import answer_generate
+
 # 配置日志
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -25,7 +27,7 @@ session = requests.Session()
 
 # 获取完成情况
 def get_course_user_statistic(token):
-    url = f"https://www.baomi.org.cn/portal/main-api/v2/coursePacket/getCourseUserStatistic?coursePacketId=78e6a04c-dd87-4794-8214-9de32be7cae1&token={token}"
+    url = f"https://www.baomi.org.cn/portal/main-api/v2/coursePacket/getCourseUserStatistic?coursePacketId=21c7d935-dd53-49d2-a95f-dc0f3e14ced7&token={token}"
     response = requests.get(url).json()
     gradeSum = response['data']['gradeSum']
     totalGrade = response['data']['totalGrade']
@@ -84,10 +86,10 @@ def save_course_package(course_id, resource_id, resource_directory_id, resource_
 def save_exam_result():
     url = "https://www.baomi.org.cn/portal/main-api/v2/activity/exam/saveExamResultJc.do"
     payload = json.dumps({
-    "examId": "8ad5b4848f198e65018f332212c10004",
-    "examResult": "[{\"parentId\":\"0\",\"qstId\":\"8ad59f838f196aef018f2887bcfc0100\",\"resultFlag\":0,\"standardAnswer\":\"D\",\"subCount\":0,\"tqId\":63,\"userAnswer\":\"D\",\"userScoreRate\":\"100%\",\"viewTypeId\":1},{\"parentId\":\"0\",\"qstId\":\"8ad59f838f196aef018f28879ae10068\",\"resultFlag\":0,\"standardAnswer\":\"D\",\"subCount\":0,\"tqId\":25,\"userAnswer\":\"D\",\"userScoreRate\":\"100%\",\"viewTypeId\":1},{\"parentId\":\"0\",\"qstId\":\"8ad59f838f196aef018f2887c355011c\",\"resultFlag\":0,\"standardAnswer\":\"B\",\"subCount\":0,\"tqId\":70,\"userAnswer\":\"B\",\"userScoreRate\":\"100%\",\"viewTypeId\":1},{\"parentId\":\"0\",\"qstId\":\"8ad59f838f196aef018f2887a3d30090\",\"resultFlag\":0,\"standardAnswer\":\"B\",\"subCount\":0,\"tqId\":35,\"userAnswer\":\"C\",\"userScoreRate\":\"0%\",\"viewTypeId\":1},{\"parentId\":\"0\",\"qstId\":\"8ad59f838f196aef018f2887cc5c0144\",\"resultFlag\":0,\"standardAnswer\":\"B\",\"subCount\":0,\"tqId\":80,\"userAnswer\":\"B\",\"userScoreRate\":\"100%\",\"viewTypeId\":1},{\"parentId\":\"0\",\"qstId\":\"8ad59f838f196aef018f288787250010\",\"resultFlag\":0,\"standardAnswer\":\"D\",\"subCount\":0,\"tqId\":3,\"userAnswer\":\"C\",\"userScoreRate\":\"0%\",\"viewTypeId\":1},{\"parentId\":\"0\",\"qstId\":\"8ad59f838f196aef018f28879106003c\",\"resultFlag\":0,\"standardAnswer\":\"C\",\"subCount\":0,\"tqId\":14,\"userAnswer\":\"B\",\"userScoreRate\":\"0%\",\"viewTypeId\":1},{\"parentId\":\"0\",\"qstId\":\"8ad59f838f196aef018f2887adb200bc\",\"resultFlag\":0,\"standardAnswer\":\"A\",\"subCount\":0,\"tqId\":46,\"userAnswer\":\"A\",\"userScoreRate\":\"100%\",\"viewTypeId\":1},{\"parentId\":\"0\",\"qstId\":\"8ad59f838f196aef018f2887c7d80130\",\"resultFlag\":0,\"standardAnswer\":\"C\",\"subCount\":0,\"tqId\":75,\"userAnswer\":\"C\",\"userScoreRate\":\"100%\",\"viewTypeId\":1},{\"parentId\":\"0\",\"qstId\":\"8ad59f838f196aef018f288789da001c\",\"resultFlag\":0,\"standardAnswer\":\"A\",\"subCount\":0,\"tqId\":6,\"userAnswer\":\"A\",\"userScoreRate\":\"100%\",\"viewTypeId\":1},{\"parentId\":\"0\",\"qstId\":\"8ad59f838f196aef018f2887b14900cc\",\"resultFlag\":0,\"standardAnswer\":\"D\",\"subCount\":0,\"tqId\":50,\"userAnswer\":\"D\",\"userScoreRate\":\"100%\",\"viewTypeId\":1},{\"parentId\":\"0\",\"qstId\":\"8ad59f838f196aef018f28878f390034\",\"resultFlag\":0,\"standardAnswer\":\"D\",\"subCount\":0,\"tqId\":12,\"userAnswer\":\"D\",\"userScoreRate\":\"100%\",\"viewTypeId\":1},{\"parentId\":\"0\",\"qstId\":\"8ad59f838f196aef018f2887accd00b8\",\"resultFlag\":0,\"standardAnswer\":\"B\",\"subCount\":0,\"tqId\":45,\"userAnswer\":\"B\",\"userScoreRate\":\"100%\",\"viewTypeId\":1},{\"parentId\":\"0\",\"qstId\":\"8ad59f838f196aef018f288791eb0040\",\"resultFlag\":0,\"standardAnswer\":\"B\",\"subCount\":0,\"tqId\":15,\"userAnswer\":\"B\",\"userScoreRate\":\"100%\",\"viewTypeId\":1},{\"parentId\":\"0\",\"qstId\":\"8ad59f838f196aef018f28879cac0070\",\"resultFlag\":0,\"standardAnswer\":\"D\",\"subCount\":0,\"tqId\":27,\"userAnswer\":\"D\",\"userScoreRate\":\"100%\",\"viewTypeId\":1},{\"parentId\":\"0\",\"qstId\":\"8ad59f838f196aef018f2887cb750140\",\"resultFlag\":0,\"standardAnswer\":\"B\",\"subCount\":0,\"tqId\":79,\"userAnswer\":\"B\",\"userScoreRate\":\"100%\",\"viewTypeId\":1},{\"parentId\":\"0\",\"qstId\":\"8ad59f838f196aef018f2887b79300e8\",\"resultFlag\":0,\"standardAnswer\":\"C\",\"subCount\":0,\"tqId\":57,\"userAnswer\":\"C\",\"userScoreRate\":\"100%\",\"viewTypeId\":1},{\"parentId\":\"0\",\"qstId\":\"8ad59f838f196aef018f28879f5a007c\",\"resultFlag\":0,\"standardAnswer\":\"B\",\"subCount\":0,\"tqId\":30,\"userAnswer\":\"B\",\"userScoreRate\":\"100%\",\"viewTypeId\":1},{\"parentId\":\"0\",\"qstId\":\"8ad59f838f196aef018f28878ba40024\",\"resultFlag\":0,\"standardAnswer\":\"D\",\"subCount\":0,\"tqId\":8,\"userAnswer\":\"D\",\"userScoreRate\":\"100%\",\"viewTypeId\":1},{\"parentId\":\"0\",\"qstId\":\"8ad59f838f196aef018f2887b06200c8\",\"resultFlag\":0,\"standardAnswer\":\"D\",\"subCount\":0,\"tqId\":49,\"userAnswer\":\"D\",\"userScoreRate\":\"100%\",\"viewTypeId\":1},{\"parentId\":\"0\",\"qstId\":\"8ad59f838f196aef018f2887f09101e4\",\"resultFlag\":0,\"standardAnswer\":\"A\",\"subCount\":0,\"tqId\":120,\"userAnswer\":\"A\",\"userScoreRate\":\"100%\",\"viewTypeId\":3},{\"parentId\":\"0\",\"qstId\":\"8ad59f838f196aef018f2887dc9c018c\",\"resultFlag\":0,\"standardAnswer\":\"B\",\"subCount\":0,\"tqId\":98,\"userAnswer\":\"B\",\"userScoreRate\":\"100%\",\"viewTypeId\":3},{\"parentId\":\"0\",\"qstId\":\"8ad59f838f196aef018f2887e20c01a4\",\"resultFlag\":0,\"standardAnswer\":\"B\",\"subCount\":0,\"tqId\":104,\"userAnswer\":\"B\",\"userScoreRate\":\"100%\",\"viewTypeId\":3},{\"parentId\":\"0\",\"qstId\":\"8ad59f838f196aef018f2887ecee01d4\",\"resultFlag\":0,\"standardAnswer\":\"A\",\"subCount\":0,\"tqId\":116,\"userAnswer\":\"A\",\"userScoreRate\":\"100%\",\"viewTypeId\":3},{\"parentId\":\"0\",\"qstId\":\"8ad59f838f196aef018f2887eb1d01cc\",\"resultFlag\":0,\"standardAnswer\":\"B\",\"subCount\":0,\"tqId\":114,\"userAnswer\":\"B\",\"userScoreRate\":\"100%\",\"viewTypeId\":3}]",
-    "startDate": "2024-05-10 16:14:22",
-    "randomId": "dd98488d30f1fded7d3600c7f707b6fc"
+    "examId": "8ad5a4cf95a7e09701961d54fa6f00d8",
+    "examResult": answer_generate.get_answer(),
+    "startDate": "2025-05-06 10:53:52",
+    "randomId": "bff5dc52146c9bbd848422354daf2776"
     })
     response = requests.request("POST", url, headers=headers, data=payload)
 
@@ -119,7 +121,7 @@ def process_video(course_packet_id, directory_id):
         logging.error(f"处理视频失败: {e}")
 
 if __name__ == '__main__':
-    course_packet_id = '78e6a04c-dd87-4794-8214-9de32be7cae1'  # 2024年度保密教育线上培训 课程参数
+    course_packet_id = '21c7d935-dd53-49d2-a95f-dc0f3e14ced7'  # 2025年度保密教育线上培训 课程参数
     timestamp = int(time.time())
 
     try:
@@ -133,7 +135,8 @@ if __name__ == '__main__':
     except requests.exceptions.RequestException as e:
         logging.error(f"获取目录列表失败: {e}")
         
-    while not get_course_user_statistic(token):
-        time.sleep(10)
-        save_exam_result()
-        finish_exam(course_packet_id)
+    time.sleep(1)   
+    save_exam_result()
+    finish_exam(course_packet_id)
+    time.sleep(3) 
+    print('刷课完成, 再见！')
