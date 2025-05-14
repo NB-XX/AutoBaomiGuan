@@ -1,139 +1,188 @@
 import requests
 import time
 import logging
-from concurrent.futures import ThreadPoolExecutor
 import json 
-import time
+import os
+from colorama import init, Fore, Style
 import login
+
+# Initialize colorama
+init()
+
 # 配置日志
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# 读取配置文件
-loginName = input("请输入用户名：")
-passWord = input("请输入密码：")
-
-token = login.login(loginName, passWord)
-
-headers = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/95.0.4638.69 Safari/537.36',
-    'token': token,
-    'Content-Type': 'application/json'
-}
+# 凭证文件路径
+CREDENTIALS_FILE = 'credentials.json'
 
 # 创建会话
 session = requests.Session()
 
-# 获取完成情况
-def get_course_user_statistic(token):
-    url = f"https://www.baomi.org.cn/portal/main-api/v2/coursePacket/getCourseUserStatistic?coursePacketId=78e6a04c-dd87-4794-8214-9de32be7cae1&token={token}"
-    response = requests.get(url).json()
-    gradeSum = response['data']['gradeSum']
-    totalGrade = response['data']['totalGrade']
-    if gradeSum == totalGrade:
-        return True
-
-# 获取课程时长
-def view_resource_details(token, resource_directory_id):
-    timestamp = int(time.time())
-    url = 'http://www.baomi.org.cn/portal/api/v2/coursePacket/viewResourceDetails'
-    post_data = {
+def get_headers(token):
+    """返回带有当前token的headers"""
+    return {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/95.0.4638.69 Safari/537.36',
         'token': token,
-        'resourceDirectoryId': resource_directory_id,
-        'timestamps': timestamp
+        'authToken': token,
+        'siteId': '95',
+        'Content-Type': 'application/json'
     }
-    try:
-        response = session.get(url, params=post_data, headers=headers)
-        response.raise_for_status()  # 检查响应状态码
-        data = response.json()['data']
-        resource_length = data['resourceLength']
-        resource_id = data['resourceID']
-        display_order = data['displayOrder']
-        logging.info(f"正在刷: {data['name']}")
-        return resource_length, resource_id, display_order
-    except requests.exceptions.RequestException as e:
-        logging.error(f"获取课程时长失败: {e}")
-        return None, None, None
 
-# 传递观看时间
-def save_course_package(course_id, resource_id, resource_directory_id, resource_length, study_length, study_time, display_order, token):
-    url = 'http://www.baomi.org.cn/portal/api/v2/studyTime/saveCoursePackage.do'
-    timestamp = int(time.time())
-    post_data = {
-        'courseId': course_id,
-        'resourceId': resource_id,
-        'resourceDirectoryId': resource_directory_id,
-        'resourceLength': resource_length,
-        'studyLength': study_length,
-        'studyTime': study_time,
-        'startTime': timestamp - int(resource_length),
-        'resourceType': 1,
-        'resourceLibId': 3,
+def save_credentials(loginName, passWord, token):
+    """保存用户凭证到本地文件"""
+    data = {
+        'loginName': loginName,
+        'passWord': passWord,
         'token': token,
-        'studyResourceId': display_order,
-        'timestamps': timestamp
+        'timestamp': int(time.time())
     }
+    
+    with open(CREDENTIALS_FILE, 'w') as f:
+        json.dump(data, f)
+    logging.info(f"{Fore.GREEN}凭证已保存{Style.RESET_ALL}")
+
+def load_credentials():
+    """从本地文件加载用户凭证"""
+    if not os.path.exists(CREDENTIALS_FILE):
+        return None
+    
     try:
-        response = session.get(url, params=post_data, headers=headers)
-        response.raise_for_status()  # 检查响应状态码
-        message = response.json()['message']
-        logging.info(message)
-    except requests.exceptions.RequestException as e:
-        logging.error(f"保存课程包失败: {e}")
+        with open(CREDENTIALS_FILE, 'r') as f:
+            return json.load(f)
+    except Exception as e:
+        logging.error(f"{Fore.RED}加载凭证失败: {e}{Style.RESET_ALL}")
+        return None
 
-# 自动完成考试
-def save_exam_result():
-    url = "https://www.baomi.org.cn/portal/main-api/v2/activity/exam/saveExamResultJc.do"
-    payload = json.dumps({
-    "examId": "8ad5b4848f198e65018f332212c10004",
-    "examResult": "[{\"parentId\":\"0\",\"qstId\":\"8ad59f838f196aef018f2887bcfc0100\",\"resultFlag\":0,\"standardAnswer\":\"D\",\"subCount\":0,\"tqId\":63,\"userAnswer\":\"D\",\"userScoreRate\":\"100%\",\"viewTypeId\":1},{\"parentId\":\"0\",\"qstId\":\"8ad59f838f196aef018f28879ae10068\",\"resultFlag\":0,\"standardAnswer\":\"D\",\"subCount\":0,\"tqId\":25,\"userAnswer\":\"D\",\"userScoreRate\":\"100%\",\"viewTypeId\":1},{\"parentId\":\"0\",\"qstId\":\"8ad59f838f196aef018f2887c355011c\",\"resultFlag\":0,\"standardAnswer\":\"B\",\"subCount\":0,\"tqId\":70,\"userAnswer\":\"B\",\"userScoreRate\":\"100%\",\"viewTypeId\":1},{\"parentId\":\"0\",\"qstId\":\"8ad59f838f196aef018f2887a3d30090\",\"resultFlag\":0,\"standardAnswer\":\"B\",\"subCount\":0,\"tqId\":35,\"userAnswer\":\"C\",\"userScoreRate\":\"0%\",\"viewTypeId\":1},{\"parentId\":\"0\",\"qstId\":\"8ad59f838f196aef018f2887cc5c0144\",\"resultFlag\":0,\"standardAnswer\":\"B\",\"subCount\":0,\"tqId\":80,\"userAnswer\":\"B\",\"userScoreRate\":\"100%\",\"viewTypeId\":1},{\"parentId\":\"0\",\"qstId\":\"8ad59f838f196aef018f288787250010\",\"resultFlag\":0,\"standardAnswer\":\"D\",\"subCount\":0,\"tqId\":3,\"userAnswer\":\"C\",\"userScoreRate\":\"0%\",\"viewTypeId\":1},{\"parentId\":\"0\",\"qstId\":\"8ad59f838f196aef018f28879106003c\",\"resultFlag\":0,\"standardAnswer\":\"C\",\"subCount\":0,\"tqId\":14,\"userAnswer\":\"B\",\"userScoreRate\":\"0%\",\"viewTypeId\":1},{\"parentId\":\"0\",\"qstId\":\"8ad59f838f196aef018f2887adb200bc\",\"resultFlag\":0,\"standardAnswer\":\"A\",\"subCount\":0,\"tqId\":46,\"userAnswer\":\"A\",\"userScoreRate\":\"100%\",\"viewTypeId\":1},{\"parentId\":\"0\",\"qstId\":\"8ad59f838f196aef018f2887c7d80130\",\"resultFlag\":0,\"standardAnswer\":\"C\",\"subCount\":0,\"tqId\":75,\"userAnswer\":\"C\",\"userScoreRate\":\"100%\",\"viewTypeId\":1},{\"parentId\":\"0\",\"qstId\":\"8ad59f838f196aef018f288789da001c\",\"resultFlag\":0,\"standardAnswer\":\"A\",\"subCount\":0,\"tqId\":6,\"userAnswer\":\"A\",\"userScoreRate\":\"100%\",\"viewTypeId\":1},{\"parentId\":\"0\",\"qstId\":\"8ad59f838f196aef018f2887b14900cc\",\"resultFlag\":0,\"standardAnswer\":\"D\",\"subCount\":0,\"tqId\":50,\"userAnswer\":\"D\",\"userScoreRate\":\"100%\",\"viewTypeId\":1},{\"parentId\":\"0\",\"qstId\":\"8ad59f838f196aef018f28878f390034\",\"resultFlag\":0,\"standardAnswer\":\"D\",\"subCount\":0,\"tqId\":12,\"userAnswer\":\"D\",\"userScoreRate\":\"100%\",\"viewTypeId\":1},{\"parentId\":\"0\",\"qstId\":\"8ad59f838f196aef018f2887accd00b8\",\"resultFlag\":0,\"standardAnswer\":\"B\",\"subCount\":0,\"tqId\":45,\"userAnswer\":\"B\",\"userScoreRate\":\"100%\",\"viewTypeId\":1},{\"parentId\":\"0\",\"qstId\":\"8ad59f838f196aef018f288791eb0040\",\"resultFlag\":0,\"standardAnswer\":\"B\",\"subCount\":0,\"tqId\":15,\"userAnswer\":\"B\",\"userScoreRate\":\"100%\",\"viewTypeId\":1},{\"parentId\":\"0\",\"qstId\":\"8ad59f838f196aef018f28879cac0070\",\"resultFlag\":0,\"standardAnswer\":\"D\",\"subCount\":0,\"tqId\":27,\"userAnswer\":\"D\",\"userScoreRate\":\"100%\",\"viewTypeId\":1},{\"parentId\":\"0\",\"qstId\":\"8ad59f838f196aef018f2887cb750140\",\"resultFlag\":0,\"standardAnswer\":\"B\",\"subCount\":0,\"tqId\":79,\"userAnswer\":\"B\",\"userScoreRate\":\"100%\",\"viewTypeId\":1},{\"parentId\":\"0\",\"qstId\":\"8ad59f838f196aef018f2887b79300e8\",\"resultFlag\":0,\"standardAnswer\":\"C\",\"subCount\":0,\"tqId\":57,\"userAnswer\":\"C\",\"userScoreRate\":\"100%\",\"viewTypeId\":1},{\"parentId\":\"0\",\"qstId\":\"8ad59f838f196aef018f28879f5a007c\",\"resultFlag\":0,\"standardAnswer\":\"B\",\"subCount\":0,\"tqId\":30,\"userAnswer\":\"B\",\"userScoreRate\":\"100%\",\"viewTypeId\":1},{\"parentId\":\"0\",\"qstId\":\"8ad59f838f196aef018f28878ba40024\",\"resultFlag\":0,\"standardAnswer\":\"D\",\"subCount\":0,\"tqId\":8,\"userAnswer\":\"D\",\"userScoreRate\":\"100%\",\"viewTypeId\":1},{\"parentId\":\"0\",\"qstId\":\"8ad59f838f196aef018f2887b06200c8\",\"resultFlag\":0,\"standardAnswer\":\"D\",\"subCount\":0,\"tqId\":49,\"userAnswer\":\"D\",\"userScoreRate\":\"100%\",\"viewTypeId\":1},{\"parentId\":\"0\",\"qstId\":\"8ad59f838f196aef018f2887f09101e4\",\"resultFlag\":0,\"standardAnswer\":\"A\",\"subCount\":0,\"tqId\":120,\"userAnswer\":\"A\",\"userScoreRate\":\"100%\",\"viewTypeId\":3},{\"parentId\":\"0\",\"qstId\":\"8ad59f838f196aef018f2887dc9c018c\",\"resultFlag\":0,\"standardAnswer\":\"B\",\"subCount\":0,\"tqId\":98,\"userAnswer\":\"B\",\"userScoreRate\":\"100%\",\"viewTypeId\":3},{\"parentId\":\"0\",\"qstId\":\"8ad59f838f196aef018f2887e20c01a4\",\"resultFlag\":0,\"standardAnswer\":\"B\",\"subCount\":0,\"tqId\":104,\"userAnswer\":\"B\",\"userScoreRate\":\"100%\",\"viewTypeId\":3},{\"parentId\":\"0\",\"qstId\":\"8ad59f838f196aef018f2887ecee01d4\",\"resultFlag\":0,\"standardAnswer\":\"A\",\"subCount\":0,\"tqId\":116,\"userAnswer\":\"A\",\"userScoreRate\":\"100%\",\"viewTypeId\":3},{\"parentId\":\"0\",\"qstId\":\"8ad59f838f196aef018f2887eb1d01cc\",\"resultFlag\":0,\"standardAnswer\":\"B\",\"subCount\":0,\"tqId\":114,\"userAnswer\":\"B\",\"userScoreRate\":\"100%\",\"viewTypeId\":3}]",
-    "startDate": "2024-05-10 16:14:22",
-    "randomId": "dd98488d30f1fded7d3600c7f707b6fc"
-    })
-    response = requests.request("POST", url, headers=headers, data=payload)
-
-    print(response.text)
-
-
-def finish_exam(course_packet_id):
-    url = f"https://www.baomi.org.cn/portal/main-api/v2/studyTime/updateCoursePackageExamInfo.do?courseId={course_packet_id}&orgId=&isExam=1&isCertificate=0&examResult=100"
+# 检查登录情况
+def check_login(token):
+    """检查token是否有效，返回用户昵称或False"""
+    if not token:
+        return False
+        
+    headers = get_headers(token)
+    url = 'https://www.baomi.org.cn/portal/main-api/checkToken.do'
     try:
-        response = session.get(url, headers=headers)
-        response.raise_for_status()  # 检查响应状态码
-        message = response.json()['message']
-        logging.info(message)
-    except requests.exceptions.RequestException as e:
-        logging.error(f"完成考试失败: {e}")
+        response = session.get(url, headers=headers).json()
+        result = response.get('result')
+        if result:
+            return response['data']['nickName']
+    except Exception as e:
+        logging.error(f"{Fore.RED}检查token失败: {e}{Style.RESET_ALL}")
+    
+    return False
 
-def process_video(course_packet_id, directory_id):
-    timestamp = int(time.time())
+def get_user_credentials():
+    """获取用户凭证，优先使用保存的凭证，否则进行登录"""
+    # 检查是否有保存的凭证
+    saved_creds = load_credentials()
+    
+    if saved_creds:
+        # 提示用户是否使用保存的凭证
+        print(f"{Fore.YELLOW}发现保存的用户名: {saved_creds['loginName']}{Style.RESET_ALL}")
+        use_saved = input(f"{Fore.CYAN}是否使用保存的凭证自动登录? (y/n): {Style.RESET_ALL}").lower() == 'y'
+        
+        if use_saved:
+            # 验证保存的token
+            token = saved_creds['token']
+            if check_login(token):
+                print(f"{Fore.GREEN}使用已保存的凭证登录成功{Style.RESET_ALL}")
+                return saved_creds['loginName'], saved_creds['passWord'], token
+            else:
+                print(f"{Fore.YELLOW}保存的凭证已过期，需要重新登录{Style.RESET_ALL}")
+    
+    # 获取新凭证
+    print(f"{Fore.CYAN}请输入新凭证进行登录{Style.RESET_ALL}")
+    loginName = input(f"{Fore.CYAN}请输入用户名: {Style.RESET_ALL}")
+    passWord = input(f"{Fore.CYAN}请输入密码: {Style.RESET_ALL}")
+    
+    # 执行登录
     try:
-        resource_directory_ids = session.get('http://www.baomi.org.cn/portal/api/v2/coursePacket/getCourseResourceList', params={'coursePacketId': course_packet_id, 'directoryId': directory_id, 'timestamps': timestamp}, headers=headers).json()['data']['listdata']
-        for resource_info in resource_directory_ids:
-            resource_directory_id = resource_info['SYS_UUID']
-            directory_id = resource_info['directoryID']
-            resource_length, resource_id, display_order = view_resource_details(token, resource_directory_id)
-            if resource_length is not None:
-                save_course_package(course_packet_id, resource_id, resource_directory_id, resource_length, 0, 180, display_order, token)
-                save_course_package(course_packet_id, resource_id, resource_directory_id, resource_length, resource_length, resource_length, display_order, token)
-    except requests.exceptions.RequestException as e:
-        logging.error(f"处理视频失败: {e}")
+        token = login.login(loginName, passWord)
+        print(f"{Fore.GREEN}登录成功获取到token!{Style.RESET_ALL}")
+        
+        # 自动保存凭证
+        save_credentials(loginName, passWord, token)
+        print(f"{Fore.GREEN}已自动保存凭证{Style.RESET_ALL}")
+        
+        return loginName, passWord, token
+    except Exception as e:
+        print(f"{Fore.RED}登录失败: {e}{Style.RESET_ALL}")
+        return get_user_credentials()  # 递归调用直到登录成功
+
+def display_course_menu():
+    """显示课程管理菜单"""
+    print(f"\n{Fore.CYAN}============ 课程管理菜单 ============{Style.RESET_ALL}")
+    print(f"{Fore.YELLOW}1. 查看课程目录{Style.RESET_ALL}")
+    print(f"{Fore.YELLOW}2. 查看课程进度{Style.RESET_ALL}")
+    print(f"{Fore.YELLOW}3. 开始学习课程{Style.RESET_ALL}")
+    print(f"{Fore.YELLOW}4. 完成课程考试{Style.RESET_ALL}")
+    print(f"{Fore.YELLOW}0. 退出程序{Style.RESET_ALL}")
+    choice = input(f"\n{Fore.CYAN}请选择操作 (0-4): {Style.RESET_ALL}")
+    return choice
+
+def handle_course_menu(course_manager):
+    """处理课程管理菜单选择"""
+    while True:
+        choice = display_course_menu()
+        
+        if choice == '0':
+            print(f"\n{Fore.GREEN}感谢使用，再见！{Style.RESET_ALL}")
+            break
+        elif choice == '1':
+            # 获取课程目录
+            course_info = course_manager.get_course_info('21c7d935-dd53-49d2-a95f-dc0f3e14ced7')
+            if course_info and course_info.get('data'):
+                print(f"\n{Fore.GREEN}当前课程: {course_info['data']['name']}{Style.RESET_ALL}")
+                print(f"课程说明: {course_info['data']['note']}")
+                
+                directory = course_manager.get_course_directory('21c7d935-dd53-49d2-a95f-dc0f3e14ced7')
+                if directory and directory.get('data'):
+                    print(f"\n{Fore.CYAN}课程目录:{Style.RESET_ALL}")
+                    for section in directory['data']:
+                        print(f"\n{Fore.YELLOW}{section['name']}{Style.RESET_ALL}")
+                        for sub in section['subDirectory']:
+                            print(f"  - {sub['name']}")
+        elif choice == '2':
+            # 查看课程进度
+            progress = course_manager.get_course_progress('21c7d935-dd53-49d2-a95f-dc0f3e14ced7')
+            if progress and progress.get('data'):
+                data = progress['data']
+                print(f"\n{Fore.CYAN}课程进度信息:{Style.RESET_ALL}")
+                print(f"课程名称: {data['courseName']}")
+                print(f"学习进度: {data['progressRate']*100:.1f}%")
+                print(f"已学课程数: {data['studyResourceNum']}/{data['resourceSum']}")
+                print(f"总学习时长: {data['totalStudyTime']}秒")
+                print(f"是否完成: {'是' if data['isFinish'] else '否'}")
+                print(f"是否获得证书: {'是' if data['isCertificate'] else '否'}")
+        elif choice == '3':
+            # 开始自动学习课程
+            print(f"\n{Fore.CYAN}开始自动学习课程...{Style.RESET_ALL}")
+            if course_manager.study_course('21c7d935-dd53-49d2-a95f-dc0f3e14ced7'):
+                print(f"\n{Fore.GREEN}课程学习完成！{Style.RESET_ALL}")
+            else:
+                print(f"\n{Fore.RED}课程学习失败，请稍后重试{Style.RESET_ALL}")
+        elif choice == '4':
+            # 开始自动完成考试
+            print(f"\n{Fore.CYAN}开始自动完成考试...{Style.RESET_ALL}")
+            if course_manager.complete_exam('21c7d935-dd53-49d2-a95f-dc0f3e14ced7'):
+                print(f"\n{Fore.GREEN}考试完成！{Style.RESET_ALL}")
+            else:
+                print(f"\n{Fore.RED}考试完成失败，请稍后重试{Style.RESET_ALL}")
+        else:
+            print(f"\n{Fore.RED}无效的选择，请重试{Style.RESET_ALL}")
 
 if __name__ == '__main__':
-    course_packet_id = '78e6a04c-dd87-4794-8214-9de32be7cae1'  # 2024年度保密教育线上培训 课程参数
-    timestamp = int(time.time())
-
-    try:
-        directory_ids = session.get('http://www.baomi.org.cn/portal/api/v2/coursePacket/getCourseDirectoryList', params={'scale': 1, 'coursePacketId': course_packet_id, 'timestamps': timestamp}, headers=headers).json()['data']
-        with ThreadPoolExecutor(max_workers=10) as executor:
-            for directory in directory_ids:
-                sub_directories = directory['subDirectory']
-                for sub_dir in sub_directories:
-                    executor.submit(process_video, course_packet_id, sub_dir['SYS_UUID'])
-        print('视频观看完成, 开始考试...')
-    except requests.exceptions.RequestException as e:
-        logging.error(f"获取目录列表失败: {e}")
-        
-    while not get_course_user_statistic(token):
-        time.sleep(10)
-        save_exam_result()
-        finish_exam(course_packet_id)
+    print(f"{Fore.CYAN}============ 保密教育登录程序 ============{Style.RESET_ALL}")
+    loginName, passWord, token = get_user_credentials()
+    
+    # 验证登录状态
+    nickname = check_login(token)
+    if nickname:
+        print(f"{Fore.GREEN}登录成功! 欢迎, {nickname}{Style.RESET_ALL}")
+        # 初始化课程管理器
+        from course import CourseManager
+        course_manager = CourseManager(session, token)
+        # 显示课程管理菜单
+        handle_course_menu(course_manager)
+    else:
+        print(f"{Fore.RED}登录失败或token无效{Style.RESET_ALL}")
