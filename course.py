@@ -4,6 +4,8 @@ from colorama import Fore, Style
 import time
 import random
 import string
+import hashlib
+
 class CourseManager:
     def __init__(self, session, token):
         self.session = session
@@ -127,9 +129,19 @@ class CourseManager:
             logging.error(f"{Fore.RED}时间格式转换失败: {e}{Style.RESET_ALL}")
             return 0
 
+    def generate_custom_random_id(self):
+        """生成一个自定义的随机ID"""
+        e = random.randint(1, 500)
+        base_string = f"founder{e}"
+        md5_hash_object = hashlib.md5()
+        
+        md5_hash_object.update(base_string.encode('utf-8'))
+        random_id = md5_hash_object.hexdigest()
+        return random_id
+
     def get_exam_info(self, course_packet_id):
         """获取考试信息"""
-        url = 'https://www.baomi.org.cn/portal/main-api/v2/coursePacket/getCourseRuleConfig'
+        url = 'https://www.baomi.org.cn/portal/main-api/v2/coursePacket/getCourseRelateExam'
         params = {
             'coursePacketId': course_packet_id,
             'token': self.token
@@ -149,7 +161,6 @@ class CourseManager:
             'examId': exam_id,
             'randomId': random_id
         }
-
         try:
             response = self.session.get(url, headers=self.headers, params=params)
             response.raise_for_status()
@@ -158,25 +169,39 @@ class CourseManager:
             logging.error(f"{Fore.RED}获取试卷答案失败: {e}{Style.RESET_ALL}")
             return None
 
-    def submit_exam_answers(self, exam_id, answers, start_date,random_id):
+    def submit_exam_answers(self, exam_id, answers, start_date, random_id):
         """提交考试答案"""
+        import json
 
-        url = 'https://www.baomi.org.cn/portal/main-api/v2/exam/saveExamResultJc.do'
-        
+        url = 'https://www.baomi.org.cn/portal/main-api/v2/activity/exam/saveExamResultJc.do'
         
         data = {
             'examId': exam_id,
-            'examResult': answers,
+            'examResult': json.dumps(answers),  # 将答案列表转换为JSON字符串
+            'randomId': random_id,
             'startDate': start_date,
-            'randomId': random_id
         }
-        
         try:
             response = self.session.post(url, headers=self.headers, json=data)
             response.raise_for_status()
             return response.json()
         except Exception as e:
             logging.error(f"{Fore.RED}提交考试答案失败: {e}{Style.RESET_ALL}")
+            return None
+
+    def get_exam_result(self, exam_id):
+        """获取考试成绩"""
+        url = 'https://www.baomi.org.cn/portal/main-api/v2/activity/exam/getExamResultMaxScore.do'
+        params = {
+            'examId': exam_id,
+            'token': self.token
+        }
+        try:
+            response = self.session.get(url, headers=self.headers, params=params)
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            logging.error(f"{Fore.RED}获取考试成绩失败: {e}{Style.RESET_ALL}")
             return None
 
     def complete_exam(self, course_packet_id):
@@ -188,38 +213,79 @@ class CourseManager:
         if not exam_info or not exam_info.get('data'):
             logging.error(f"{Fore.RED}获取考试信息失败{Style.RESET_ALL}")
             return False
-
-        exam_id = exam_info['data'].get('SYS_UUID')
+        print(f"{Fore.GREEN}获取考试信息成功{Style.RESET_ALL}")
+        exam_id = exam_info['data'][0].get('examId')
         if not exam_id:
             logging.error(f"{Fore.RED}未找到考试ID{Style.RESET_ALL}")
             return False
-        # random_id = ''.join(random.choices(string.ascii_letters + string.digits, k=32))
-        random_id = '2920023810562369ed9337f6f683e8a1'
+        random_id = self.generate_custom_random_id()
+
         # 获取试卷答案
         exam_paper = self.get_exam_answers(exam_id,random_id)
-        if not exam_paper or not exam_paper.get('data') or not exam_paper['data'].get('questions'):
+        if not exam_paper or not exam_paper.get('data'):
             logging.error(f"{Fore.RED}获取试卷答案失败{Style.RESET_ALL}")
+            return False
+        print(f"{Fore.GREEN}获取试卷答案成功{Style.RESET_ALL}")
+        # 获取新的randomId
+        random_id = exam_paper['data'].get('randomId')
+        # random_id = "820c25b96ac65f0200bde3264fb0dffc"
+
+        if not random_id:
+            logging.error(f"{Fore.RED}获取randomId失败{Style.RESET_ALL}")
             return False
 
         # 准备答案数据
         answers = []
-        for question in exam_paper['data']['questions']:
-            answer_data = {
-                'questionId': question['id'],
-                'tqId': question['tqId'],
-                'answer': question['answer']
-            }
-            answers.append(answer_data)
+        type_list = exam_paper['data'].get('typeList', [])
+        for type_item in type_list:
+            question_list = type_item.get('questionList', [])
+            for question in question_list:
+                # 获取正确答案
+                correct_answer = question['answer']
+                # 构造答案数据，完全按照示例格式
+                answer_data = {
+                    'parentId': '0',
+                    'qstId': question['id'],
+                    'resultFlag': 0,
+                    'standardAnswer': correct_answer,
+                    'subCount': 0,
+                    'tqId': question['tqId'],
+                    'userAnswer': correct_answer,  # 使用正确答案
+                    'userScoreRate': '100%',  # 使用正确答案，得分率100%
+                    'viewTypeId': type_item.get('type', 1)  # 题目类型
+                }
+                answers.append(answer_data)
 
         # 提交答案
-        start_date = int(time.time() * 1000)  # 当前时间戳（毫秒）
-        result = self.submit_exam_answers(exam_id, answers, start_date,random_id)
+        start_date = time.strftime("%Y-%m-%d %H:%M:%S")  # 获取当前时间并格式化为指定格式
+        result = self.submit_exam_answers(exam_id, answers, start_date, random_id)
 
         if result and result.get('status') == 0:
-            print(f"{Fore.GREEN}考试完成成功！{Style.RESET_ALL}")
+            print(f"{Fore.GREEN}答案提交成功！{Style.RESET_ALL}")
+            
+            # 获取考试成绩
+            print(f"{Fore.YELLOW}正在查询考试成绩...{Style.RESET_ALL}")
+            time.sleep(2)  # 等待服务器处理成绩
+            exam_result = self.get_exam_result(exam_id)
+            
+            if exam_result and exam_result.get('status') == 0 and exam_result.get('data'):
+                data = exam_result['data']
+                print(f"{Fore.GREEN}考试成绩查询成功！{Style.RESET_ALL}")
+                print(f"{Fore.CYAN}考试名称: {data.get('exam_name', '未知')}{Style.RESET_ALL}")
+                print(f"{Fore.CYAN}考试成绩: {data.get('score', '未知')} 分{Style.RESET_ALL}")
+                print(f"{Fore.CYAN}答题次数: {data.get('answerCount', '未知')} 次{Style.RESET_ALL}")
+                print(f"{Fore.CYAN}提交时间: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(int(data.get('submit_date', 0))/1000))}{Style.RESET_ALL}")
+                
+                # 更新考试完成状态
+                score = data.get('score', 100)
+                self.finish_exam(course_packet_id, score)
+            else:
+                print(f"{Fore.YELLOW}考试成绩查询失败或暂未生成，使用默认分数更新考试状态{Style.RESET_ALL}")
+                self.finish_exam(course_packet_id)
+            
             return True
         else:
-            print(f"{Fore.RED}考试完成失败！{Style.RESET_ALL}")
+            print(f"{Fore.RED}答案提交失败！{result.get('message', '')}{Style.RESET_ALL}")
             return False
 
     def study_course(self, course_packet_id):
@@ -275,3 +341,28 @@ class CourseManager:
                         time.sleep(2)
 
         return True
+
+    def finish_exam(self, course_packet_id, exam_score=100):
+        """更新考试完成状态"""
+        url = f"https://www.baomi.org.cn/portal/main-api/v2/studyTime/updateCoursePackageExamInfo.do"
+        params = {
+            'courseId': course_packet_id,
+            'orgId': '',
+            'isExam': 1,
+            'isCertificate': 0,
+            'examResult': exam_score,
+            'token': self.token
+        }
+        try:
+            response = self.session.get(url, headers=self.headers, params=params)
+            response.raise_for_status()
+            result = response.json()
+            if result and result.get('status') == 0:
+                print(f"{Fore.GREEN}考试状态更新成功！{Style.RESET_ALL}")
+                return True
+            else:
+                print(f"{Fore.RED}考试状态更新失败！{result.get('message', '')}{Style.RESET_ALL}")
+                return False
+        except Exception as e:
+            logging.error(f"{Fore.RED}更新考试状态失败: {e}{Style.RESET_ALL}")
+            return False
