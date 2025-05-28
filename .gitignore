@@ -1,0 +1,32 @@
+# --- Python 相关 ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+venv/
+env/
+*.env
+.venv/
+
+# --- PyCharm IDE 配置 ---
+/.idea/
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# --- 操作系统/编辑器临时文件 ---
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# --- 日志和数据库 ---
+*.log
+*.sqlite
+*.db
+
+/.vscode/
+credentials.json
