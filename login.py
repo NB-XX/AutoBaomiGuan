@@ -1,5 +1,4 @@
 import requests
-import execjs
 import logging
 from colorama import Fore, Style
 from Crypto.PublicKey import RSA
@@ -33,13 +32,7 @@ def rsa_encrypt_pkcs1v15(data: str, public_key: str) -> str:
 
 
 def encrypt(data):
-    # 加载JavaScript代码
     try:
-        # with open('encrypt.js', 'r', encoding='utf-8') as file:
-        #     js_code = file.read()
-        #
-        # # 初始化一个 JS 上下文
-        # ctx = execjs.compile(js_code)
         key_url = 'https://www.baomi.org.cn/portal/main-api/getPublishKey.do'
         response = requests.get(key_url)
         if response.status_code != 200:
@@ -47,8 +40,6 @@ def encrypt(data):
             return None
 
         public_key = response.json()['data']
-        # 调用 JavaScript 中的 encrypt 函数
-        # encrypted_data = ctx.call('encrypt', data, public_key)
         encrypted_data = rsa_encrypt_pkcs1v15(data, public_key)
         return encrypted_data
     except Exception as e:
