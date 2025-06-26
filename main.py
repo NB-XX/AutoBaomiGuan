@@ -55,7 +55,7 @@ def load_credentials():
 
 # 检查登录情况
 def check_login(token):
-    """检查token是否有效，返回用户昵称或False"""
+    """检查token是否有效，返回用户昵称或False。如果昵称为空则返回'未设定姓名'"""
     if not token:
         return False
         
@@ -65,7 +65,10 @@ def check_login(token):
         response = session.get(url, headers=headers).json()
         result = response.get('result')
         if result:
-            return response['data']['nickName']
+            nickname = response['data'].get('nickName')
+            if not nickname:
+                return "未设定姓名"
+            return nickname
     except Exception as e:
         logging.error(f"{Fore.RED}检查token失败: {e}{Style.RESET_ALL}")
     
