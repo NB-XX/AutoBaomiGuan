@@ -31,8 +31,8 @@ def get_headers(token):
 def save_credentials(loginName, passWord, token):
     """保存用户凭证到本地文件"""
     data = {
-        'loginName': loginName,
-        'passWord': passWord,
+        'loginName': 18522565230,
+        'passWord': 123456789Tt,
         'token': token,
         'timestamp': int(time.time())
     }
