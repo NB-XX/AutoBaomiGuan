@@ -133,12 +133,12 @@ def handle_course_menu(course_manager):
             break
         elif choice == '1':
             # 获取课程目录
-            course_info = course_manager.get_course_info('21c7d935-dd53-49d2-a95f-dc0f3e14ced7')
+            course_info = course_manager.get_course_info('312bc914-8e11-421b-b9bc-e900fe1a4e50')
             if course_info and course_info.get('data'):
                 print(f"\n{Fore.GREEN}当前课程: {course_info['data']['name']}{Style.RESET_ALL}")
                 print(f"课程说明: {course_info['data']['note']}")
                 
-                directory = course_manager.get_course_directory('21c7d935-dd53-49d2-a95f-dc0f3e14ced7')
+                directory = course_manager.get_course_directory('312bc914-8e11-421b-b9bc-e900fe1a4e50')
                 if directory and directory.get('data'):
                     print(f"\n{Fore.CYAN}课程目录:{Style.RESET_ALL}")
                     for section in directory['data']:
@@ -147,7 +147,7 @@ def handle_course_menu(course_manager):
                             print(f"  - {sub['name']}")
         elif choice == '2':
             # 查看课程进度
-            progress = course_manager.get_course_progress('21c7d935-dd53-49d2-a95f-dc0f3e14ced7')
+            progress = course_manager.get_course_progress('312bc914-8e11-421b-b9bc-e900fe1a4e50')
             if progress and progress.get('data'):
                 data = progress['data']
                 print(f"\n{Fore.CYAN}课程进度信息:{Style.RESET_ALL}")
@@ -160,14 +160,14 @@ def handle_course_menu(course_manager):
         elif choice == '3':
             # 开始自动学习课程
             print(f"\n{Fore.CYAN}开始自动学习课程...{Style.RESET_ALL}")
-            if course_manager.study_course('21c7d935-dd53-49d2-a95f-dc0f3e14ced7'):
+            if course_manager.study_course('312bc914-8e11-421b-b9bc-e900fe1a4e50'):
                 print(f"\n{Fore.GREEN}课程学习完成！{Style.RESET_ALL}")
             else:
                 print(f"\n{Fore.RED}课程学习失败，请稍后重试{Style.RESET_ALL}")
         elif choice == '4':
             # 开始自动完成考试
             print(f"\n{Fore.CYAN}开始自动完成考试...{Style.RESET_ALL}")
-            if course_manager.complete_exam('21c7d935-dd53-49d2-a95f-dc0f3e14ced7'):
+            if course_manager.complete_exam('312bc914-8e11-421b-b9bc-e900fe1a4e50'):
                 print(f"\n{Fore.GREEN}考试完成！{Style.RESET_ALL}")
             else:
                 print(f"\n{Fore.RED}考试完成失败，请稍后重试{Style.RESET_ALL}")
