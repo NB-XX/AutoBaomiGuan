@@ -1,9 +1,14 @@
 import requests
 import logging
+import json
+import time
 from colorama import Fore, Style
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_v1_5
 import base64
+
+QR_TOKEN_URL = "https://www.baomi.org.cn/portal/main-api/v2/spc/getQrToken.do"
+QR_CHECK_URL = "https://www.baomi.org.cn/portal/api/v2/spc/checkQrToken.do"
 
 
 def rsa_encrypt_pkcs1v15(data: str, public_key: str) -> str:
@@ -45,6 +50,83 @@ def encrypt(data):
     except Exception as e:
         logging.error(f"{Fore.RED}加密过程出错: {e}{Style.RESET_ALL}")
         raise Exception(f"加密数据失败: {e}")
+
+
+def parse_qr_token(qr_payload: str) -> str:
+    try:
+        payload = json.loads(qr_payload)
+        qr_token = payload["params"]["qrToken"]
+    except (json.JSONDecodeError, KeyError, TypeError) as e:
+        raise ValueError("二维码内容缺少 qrToken") from e
+
+    if not qr_token:
+        raise ValueError("二维码内容缺少 qrToken")
+
+    return qr_token
+
+
+def get_qr_code():
+    response = requests.post(QR_TOKEN_URL, headers={"siteId": "95"})
+    if response.status_code != 200:
+        raise Exception(f"获取二维码失败，状态码: {response.status_code}")
+
+    response_data = response.json()
+    try:
+        qr_content = response_data["data"]["data"]
+    except (KeyError, TypeError) as e:
+        raise ValueError("二维码接口返回格式异常") from e
+
+    return qr_content, parse_qr_token(qr_content)
+
+
+def check_qr_login(qr_token: str) -> int:
+    response = requests.post(QR_CHECK_URL, params={"qrToken": qr_token})
+    if response.status_code != 200:
+        raise Exception(f"检查二维码登录状态失败，状态码: {response.status_code}")
+
+    response_data = response.json()
+    try:
+        return int(response_data["data"]["data"])
+    except (KeyError, TypeError, ValueError) as e:
+        raise ValueError("二维码登录状态接口返回格式异常") from e
+
+
+def print_terminal_qr(qr_content: str) -> None:
+    try:
+        import qrcode
+    except ImportError as e:
+        raise RuntimeError("缺少 qrcode 依赖，请运行 pip install -r requirements.txt") from e
+
+    qr = qrcode.QRCode(border=2)
+    qr.add_data(qr_content)
+    qr.make(fit=True)
+    qr.print_ascii(invert=True)
+
+
+def qr_login(poll_interval: int = 3) -> str:
+    qr_content, qr_token = get_qr_code()
+    print(f"{Fore.CYAN}请使用保密观 APP 扫描下方二维码登录{Style.RESET_ALL}")
+    print_terminal_qr(qr_content)
+
+    while True:
+        try:
+            status = check_qr_login(qr_token)
+        except Exception as e:
+            logging.error(f"{Fore.RED}检查二维码登录状态失败: {e}{Style.RESET_ALL}")
+            time.sleep(poll_interval)
+            continue
+
+        if status == 1:
+            print(f"{Fore.GREEN}扫码登录成功{Style.RESET_ALL}")
+            return qr_token
+
+        if status == -1:
+            print(f"{Fore.YELLOW}二维码已失效，正在刷新...{Style.RESET_ALL}")
+            qr_content, qr_token = get_qr_code()
+            print_terminal_qr(qr_content)
+            continue
+
+        time.sleep(poll_interval)
 
 
 def login(loginName, passWord):

@@ -6,6 +6,9 @@ import random
 import string
 import hashlib
 
+DEFAULT_EXAM_ID = "8ad5bd4d9d483dde019e3e1066f60035"
+
+
 class CourseManager:
     def __init__(self, session, token):
         self.session = session
@@ -208,13 +211,7 @@ class CourseManager:
         """自动完成考试"""
         import time
 
-        # 获取考试信息
-        exam_info = self.get_exam_info(course_packet_id)
-        if not exam_info or not exam_info.get('data'):
-            logging.error(f"{Fore.RED}获取考试信息失败{Style.RESET_ALL}")
-            return False
-        print(f"{Fore.GREEN}获取考试信息成功{Style.RESET_ALL}")
-        exam_id = exam_info['data'][0].get('examId')
+        exam_id = DEFAULT_EXAM_ID
         if not exam_id:
             logging.error(f"{Fore.RED}未找到考试ID{Style.RESET_ALL}")
             return False
