@@ -14,6 +14,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 # 凭证文件路径
 CREDENTIALS_FILE = 'credentials.json'
+CURRENT_COURSE_PACKET_ID = '312bc914-8e11-421b-b9bc-e900fe1a4e50'
 
 # 创建会话
 session = requests.Session()
@@ -76,41 +77,56 @@ def check_login(token):
 
 def get_user_credentials():
     """获取用户凭证，优先使用保存的凭证，否则进行登录"""
-    # 检查是否有保存的凭证
     saved_creds = load_credentials()
-    
+
     if saved_creds:
-        # 提示用户是否使用保存的凭证
-        print(f"{Fore.YELLOW}发现保存的用户名: {saved_creds['loginName']}{Style.RESET_ALL}")
+        saved_login_name = saved_creds.get("loginName", "扫码登录用户")
+        print(f"{Fore.YELLOW}发现保存的用户名: {saved_login_name}{Style.RESET_ALL}")
         use_saved = input(f"{Fore.CYAN}是否使用保存的凭证自动登录? (y/n): {Style.RESET_ALL}").lower() == 'y'
-        
+
         if use_saved:
-            # 验证保存的token
-            token = saved_creds['token']
-            if check_login(token):
+            token = saved_creds.get('token')
+            if token and check_login(token):
                 print(f"{Fore.GREEN}使用已保存的凭证登录成功{Style.RESET_ALL}")
-                return saved_creds['loginName'], saved_creds['passWord'], token
+                return saved_login_name, saved_creds.get("passWord", ""), token
             else:
                 print(f"{Fore.YELLOW}保存的凭证已过期，需要重新登录{Style.RESET_ALL}")
-    
-    # 获取新凭证
-    print(f"{Fore.CYAN}请输入新凭证进行登录{Style.RESET_ALL}")
-    loginName = input(f"{Fore.CYAN}请输入用户名: {Style.RESET_ALL}")
-    passWord = input(f"{Fore.CYAN}请输入密码: {Style.RESET_ALL}")
-    
-    # 执行登录
-    try:
-        token = login.login(loginName, passWord)
-        print(f"{Fore.GREEN}登录成功获取到token!{Style.RESET_ALL}")
-        
-        # 自动保存凭证
-        save_credentials(loginName, passWord, token)
-        print(f"{Fore.GREEN}已自动保存凭证{Style.RESET_ALL}")
-        
-        return loginName, passWord, token
-    except Exception as e:
-        print(f"{Fore.RED}登录失败: {e}{Style.RESET_ALL}")
-        return get_user_credentials()  # 递归调用直到登录成功
+
+    while True:
+        print(f"{Fore.CYAN}请选择登录方式{Style.RESET_ALL}")
+        print(f"{Fore.YELLOW}1. 扫码登录{Style.RESET_ALL}")
+        print(f"{Fore.YELLOW}2. 账号密码登录{Style.RESET_ALL}")
+        login_method = input(f"{Fore.CYAN}请选择 (1/2): {Style.RESET_ALL}").strip()
+
+        if login_method == '1':
+            try:
+                token = login.qr_login()
+                login_name = "扫码登录用户"
+                save_credentials(login_name, "", token)
+                print(f"{Fore.GREEN}已自动保存扫码登录凭证{Style.RESET_ALL}")
+                return login_name, "", token
+            except KeyboardInterrupt:
+                print(f"\n{Fore.YELLOW}已取消扫码登录{Style.RESET_ALL}")
+            except Exception as e:
+                print(f"{Fore.RED}扫码登录失败: {e}{Style.RESET_ALL}")
+            continue
+
+        if login_method == '2':
+            print(f"{Fore.CYAN}请输入新凭证进行登录{Style.RESET_ALL}")
+            loginName = input(f"{Fore.CYAN}请输入用户名: {Style.RESET_ALL}")
+            passWord = input(f"{Fore.CYAN}请输入密码: {Style.RESET_ALL}")
+
+            try:
+                token = login.login(loginName, passWord)
+                print(f"{Fore.GREEN}登录成功获取到token!{Style.RESET_ALL}")
+                save_credentials(loginName, passWord, token)
+                print(f"{Fore.GREEN}已自动保存凭证{Style.RESET_ALL}")
+                return loginName, passWord, token
+            except Exception as e:
+                print(f"{Fore.RED}登录失败: {e}{Style.RESET_ALL}")
+            continue
+
+        print(f"{Fore.RED}无效的选择，请重试{Style.RESET_ALL}")
 
 def display_course_menu():
     """显示课程管理菜单"""
@@ -133,12 +149,12 @@ def handle_course_menu(course_manager):
             break
         elif choice == '1':
             # 获取课程目录
-            course_info = course_manager.get_course_info('312bc914-8e11-421b-b9bc-e900fe1a4e50')
+            course_info = course_manager.get_course_info(CURRENT_COURSE_PACKET_ID)
             if course_info and course_info.get('data'):
                 print(f"\n{Fore.GREEN}当前课程: {course_info['data']['name']}{Style.RESET_ALL}")
                 print(f"课程说明: {course_info['data']['note']}")
                 
-                directory = course_manager.get_course_directory('312bc914-8e11-421b-b9bc-e900fe1a4e50')
+                directory = course_manager.get_course_directory(CURRENT_COURSE_PACKET_ID)
                 if directory and directory.get('data'):
                     print(f"\n{Fore.CYAN}课程目录:{Style.RESET_ALL}")
                     for section in directory['data']:
@@ -147,7 +163,7 @@ def handle_course_menu(course_manager):
                             print(f"  - {sub['name']}")
         elif choice == '2':
             # 查看课程进度
-            progress = course_manager.get_course_progress('312bc914-8e11-421b-b9bc-e900fe1a4e50')
+            progress = course_manager.get_course_progress(CURRENT_COURSE_PACKET_ID)
             if progress and progress.get('data'):
                 data = progress['data']
                 print(f"\n{Fore.CYAN}课程进度信息:{Style.RESET_ALL}")
@@ -160,14 +176,14 @@ def handle_course_menu(course_manager):
         elif choice == '3':
             # 开始自动学习课程
             print(f"\n{Fore.CYAN}开始自动学习课程...{Style.RESET_ALL}")
-            if course_manager.study_course('312bc914-8e11-421b-b9bc-e900fe1a4e50'):
+            if course_manager.study_course(CURRENT_COURSE_PACKET_ID):
                 print(f"\n{Fore.GREEN}课程学习完成！{Style.RESET_ALL}")
             else:
                 print(f"\n{Fore.RED}课程学习失败，请稍后重试{Style.RESET_ALL}")
         elif choice == '4':
             # 开始自动完成考试
             print(f"\n{Fore.CYAN}开始自动完成考试...{Style.RESET_ALL}")
-            if course_manager.complete_exam('312bc914-8e11-421b-b9bc-e900fe1a4e50'):
+            if course_manager.complete_exam(CURRENT_COURSE_PACKET_ID):
                 print(f"\n{Fore.GREEN}考试完成！{Style.RESET_ALL}")
             else:
                 print(f"\n{Fore.RED}考试完成失败，请稍后重试{Style.RESET_ALL}")
