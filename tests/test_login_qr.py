@@ -28,7 +28,7 @@ class QrLoginTests(unittest.TestCase):
         response = Mock(status_code=200)
         response.json.return_value = {"data": {"data": qr_payload}}
 
-        with patch("login.requests.post", return_value=response) as post:
+        with patch.object(login.session, "post", return_value=response) as post:
             qr_content, qr_token = login.get_qr_code()
 
         self.assertEqual(qr_content, qr_payload)
@@ -42,7 +42,7 @@ class QrLoginTests(unittest.TestCase):
         response = Mock(status_code=200)
         response.json.return_value = {"data": {"data": 1}}
 
-        with patch("login.requests.post", return_value=response) as post:
+        with patch.object(login.session, "post", return_value=response) as post:
             status = login.check_qr_login("qr-token-789")
 
         self.assertEqual(status, 1)

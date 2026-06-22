@@ -5,6 +5,10 @@ import time
 import random
 import string
 import hashlib
+import json
+import urllib.parse
+
+import login
 
 DEFAULT_EXAM_ID = "8ad5bd4d9d483dde019e3e1066f60035"
 
@@ -13,13 +17,7 @@ class CourseManager:
     def __init__(self, session, token):
         self.session = session
         self.token = token
-        self.headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/95.0.4638.69 Safari/537.36',
-            'token': token,
-            'authToken': token,
-            'siteId': '95',
-            'Content-Type': 'application/json'
-        }
+        self.headers = login.build_headers(token)
 
     def get_course_directory(self, course_packet_id, scale=1):
         """获取培训课程目录"""
@@ -174,8 +172,6 @@ class CourseManager:
 
     def submit_exam_answers(self, exam_id, answers, start_date, random_id):
         """提交考试答案"""
-        import json
-
         url = 'https://www.baomi.org.cn/portal/main-api/v2/activity/exam/saveExamResultJc.do'
         
         data = {
@@ -207,11 +203,25 @@ class CourseManager:
             logging.error(f"{Fore.RED}获取考试成绩失败: {e}{Style.RESET_ALL}")
             return None
 
+    def _resolve_exam_id(self, course_packet_id):
+        """优先从接口动态获取考试ID，失败时回退到默认配置"""
+        exam_info = self.get_exam_info(course_packet_id)
+        try:
+            data = exam_info.get('data') if exam_info else None
+            if data:
+                exam_id = data[0].get('examId')
+                if exam_id:
+                    print(f"{Fore.GREEN}已动态获取考试ID: {exam_id}{Style.RESET_ALL}")
+                    return exam_id
+        except (AttributeError, IndexError, TypeError) as e:
+            logging.error(f"{Fore.RED}解析考试信息失败: {e}{Style.RESET_ALL}")
+
+        print(f"{Fore.YELLOW}未能动态获取考试ID，使用默认考试ID: {DEFAULT_EXAM_ID}{Style.RESET_ALL}")
+        return DEFAULT_EXAM_ID
+
     def complete_exam(self, course_packet_id):
         """自动完成考试"""
-        import time
-
-        exam_id = DEFAULT_EXAM_ID
+        exam_id = self._resolve_exam_id(course_packet_id)
         if not exam_id:
             logging.error(f"{Fore.RED}未找到考试ID{Style.RESET_ALL}")
             return False
@@ -285,11 +295,30 @@ class CourseManager:
             print(f"{Fore.RED}答案提交失败！{result.get('message', '')}{Style.RESET_ALL}")
             return False
 
+    def _is_resource_finished(self, course_packet_id, resource_directory_id, resource_length):
+        """查询某节课程是否已完成。字段名不确定，采用防御性判断：仅当明确已完成信号时返回 True。"""
+        status = self.get_resource_status(course_packet_id, resource_directory_id)
+        if not status or not status.get('data'):
+            return False
+        data = status['data']
+
+        # 常见完成标志位
+        for key in ('isFinish', 'finishStatus', 'finished', 'completeStatus'):
+            if data.get(key) in (True, 1, '1', 'true', 'True'):
+                return True
+
+        # 按学习时长判断
+        study = data.get('studyLength') or data.get('studyTime') or 0
+        total = data.get('resourceLength') or data.get('timeLength') or resource_length
+        try:
+            if total and float(study) >= float(total):
+                return True
+        except (TypeError, ValueError):
+            pass
+        return False
+
     def study_course(self, course_packet_id):
         """自动学习课程"""
-        import time
-        import urllib.parse
-
         # 获取课程目录
         directory = self.get_course_directory(course_packet_id)
         if not directory or not directory.get('data'):
@@ -299,11 +328,11 @@ class CourseManager:
         # 遍历每个章节
         for section in directory['data']:
             print(f"\n{Fore.YELLOW}开始学习章节: {section['name']}{Style.RESET_ALL}")
-            
+
             # 遍历每个子目录（具体课程）
             for sub in section['subDirectory']:
                 print(f"\n{Fore.CYAN}正在学习: {sub['name']}{Style.RESET_ALL}")
-                
+
                 # 获取课程资源列表
                 resources = self.get_course_resources(course_packet_id, sub['SYS_UUID'])
                 if not resources or not resources.get('data') or not resources['data'].get('listdata'):
@@ -313,13 +342,20 @@ class CourseManager:
                 # 遍历每个资源
                 for resource in resources['data']['listdata']:
                         resource_length = self._convert_time_to_seconds(resource['timeLength'])
+                        resource_directory_id = resource['SYS_UUID']
+
+                        # 跳过已完成资源，避免重复学习
+                        if self._is_resource_finished(course_packet_id, resource_directory_id, resource_length):
+                            print(f"{Fore.YELLOW}已学习，跳过: {resource['name']}{Style.RESET_ALL}")
+                            continue
+
                         current_time = int(time.time() * 1000)  # 转换为毫秒时间戳
-                        
+
                         # 保存学习记录
                         result = self.save_study_record(
                             course_id=course_packet_id,
                             resource_id=resource['resourceID'],
-                            resource_directory_id=resource['SYS_UUID'],
+                            resource_directory_id=resource_directory_id,
                             resource_length=resource_length,
                             study_length=resource_length,
                             study_time=resource_length,
@@ -328,14 +364,11 @@ class CourseManager:
                             resource_type='1',
                             resource_lib_id='3'
                         )
-                        
+
                         if result and result.get('status') == 0:
                             print(f"{Fore.GREEN}完成学习: {resource['name']}{Style.RESET_ALL}")
                         else:
                             print(f"{Fore.RED}学习失败: {resource['name']}{Style.RESET_ALL}")
-                        
-                        # 添加适当的延时，避免请求过于频繁
-                        time.sleep(2)
 
         return True
 

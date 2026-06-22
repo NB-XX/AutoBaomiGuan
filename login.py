@@ -7,8 +7,34 @@ from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_v1_5
 import base64
 
+# 平台固定配置
+SITE_ID = '95'
+DEVICE_ID = 1711
+LOGIN_URL = "https://www.baomi.org.cn/portal/main-api/loginInNew.do"
+PUBLISH_KEY_URL = 'https://www.baomi.org.cn/portal/main-api/getPublishKey.do'
 QR_TOKEN_URL = "https://www.baomi.org.cn/portal/main-api/v2/spc/getQrToken.do"
 QR_CHECK_URL = "https://www.baomi.org.cn/portal/api/v2/spc/checkQrToken.do"
+
+DEFAULT_USER_AGENT = (
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
+    '(KHTML, like Gecko) Chrome/95.0.4638.69 Safari/537.36'
+)
+
+# 全局共享会话，复用连接池与 cookie
+session = requests.Session()
+
+
+def build_headers(token=None):
+    """构造请求头；传入 token 时附带 token/authToken"""
+    headers = {
+        'User-Agent': DEFAULT_USER_AGENT,
+        'Content-Type': 'application/json',
+        'siteId': SITE_ID,
+    }
+    if token:
+        headers['token'] = token
+        headers['authToken'] = token
+    return headers
 
 
 def rsa_encrypt_pkcs1v15(data: str, public_key: str) -> str:
@@ -38,8 +64,7 @@ def rsa_encrypt_pkcs1v15(data: str, public_key: str) -> str:
 
 def encrypt(data):
     try:
-        key_url = 'https://www.baomi.org.cn/portal/main-api/getPublishKey.do'
-        response = requests.get(key_url)
+        response = session.get(PUBLISH_KEY_URL)
         if response.status_code != 200:
             logging.error(f"{Fore.RED}获取公钥失败，状态码: {response.status_code}{Style.RESET_ALL}")
             return None
@@ -66,7 +91,7 @@ def parse_qr_token(qr_payload: str) -> str:
 
 
 def get_qr_code():
-    response = requests.post(QR_TOKEN_URL, headers={"siteId": "95"})
+    response = session.post(QR_TOKEN_URL, headers={"siteId": SITE_ID})
     if response.status_code != 200:
         raise Exception(f"获取二维码失败，状态码: {response.status_code}")
 
@@ -80,7 +105,7 @@ def get_qr_code():
 
 
 def check_qr_login(qr_token: str) -> int:
-    response = requests.post(QR_CHECK_URL, params={"qrToken": qr_token})
+    response = session.post(QR_CHECK_URL, params={"qrToken": qr_token})
     if response.status_code != 200:
         raise Exception(f"检查二维码登录状态失败，状态码: {response.status_code}")
 
@@ -103,12 +128,17 @@ def print_terminal_qr(qr_content: str) -> None:
     qr.print_ascii(invert=True)
 
 
-def qr_login(poll_interval: int = 3) -> str:
+def qr_login(poll_interval: int = 3, timeout: int = 300) -> str:
+    """扫码登录，超时（默认 300 秒）未确认则抛出 TimeoutError"""
     qr_content, qr_token = get_qr_code()
     print(f"{Fore.CYAN}请使用保密观 APP 扫描下方二维码登录{Style.RESET_ALL}")
     print_terminal_qr(qr_content)
 
+    deadline = time.time() + timeout
     while True:
+        if time.time() > deadline:
+            raise TimeoutError(f"扫码登录超时（{timeout}秒未确认）")
+
         try:
             status = check_qr_login(qr_token)
         except Exception as e:
@@ -131,39 +161,39 @@ def qr_login(poll_interval: int = 3) -> str:
 
 def login(loginName, passWord):
     try:
-        login_url = "https://www.baomi.org.cn/portal/main-api/loginInNew.do"
         payload = {
             "loginName": encrypt(loginName),
             "passWord": encrypt(passWord),
-            "deviceId": 1711,
+            "deviceId": DEVICE_ID,
             "deviceOs": "pc",
             "lon": 40,
             "lat": 30,
-            "siteId": "95",
+            "siteId": SITE_ID,
             "sinopec": 'false'
         }
 
         headers = {
             'Content-Type': 'application/json',
-            'siteId': '95'
+            'siteId': SITE_ID
         }
-        response = requests.post(login_url, json=payload, headers=headers)
+        response = session.post(LOGIN_URL, json=payload, headers=headers)
         if response.status_code != 200:
             logging.error(f"{Fore.RED}登录请求失败，状态码: {response.status_code}{Style.RESET_ALL}")
             raise Exception(f"登录请求失败，状态码: {response.status_code}")
 
         response_data = response.json()
-        if 'token' not in response_data:
-            error_msg = response_data.get('message', '未知错误')
+        token = response_data.get('token')
+
+        # 接口无论成败都返回 token 字段（失败时为空字符串），
+        # 因此必须结合 successResult / 非空 token / result 综合判断
+        success = response_data.get('successResult')
+        if not token or success is False or str(response_data.get('result')) == '0':
+            error_obj = response_data.get('error') or {}
+            error_msg = error_obj.get('errorMsg') or response_data.get('message') or '未知错误'
             logging.error(f"{Fore.RED}登录失败: {error_msg}{Style.RESET_ALL}")
             raise Exception(f"登录失败: {error_msg}")
 
-        token = response_data['token']
         return token
     except Exception as e:
         logging.error(f"{Fore.RED}登录过程出错: {e}{Style.RESET_ALL}")
         raise
-
-
-if __name__ == '__main__':
-    encrypt("za123456")

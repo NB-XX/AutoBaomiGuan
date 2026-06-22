@@ -9,7 +9,7 @@ class MainCourseConfigTests(unittest.TestCase):
         course_manager = Mock()
         course_manager.complete_exam.return_value = True
 
-        with patch.object(main, "display_course_menu", side_effect=["4", "0"]), \
+        with patch.object(main, "display_course_menu", side_effect=["3", "0"]), \
              patch("builtins.print"):
             main.handle_course_menu(course_manager)
 

@@ -5,18 +5,38 @@ import course
 
 
 class CourseExamConfigTests(unittest.TestCase):
-    def test_complete_exam_uses_default_exam_id_when_configured(self):
+    def test_complete_exam_uses_dynamic_exam_id_when_available(self):
         manager = course.CourseManager(Mock(), "token")
         manager.get_exam_answers = Mock(return_value=None)
+        manager.get_exam_info = Mock(
+            return_value={"data": [{"examId": "dynamic-exam-id"}]}
+        )
 
-        with patch.object(manager, "get_exam_info") as get_exam_info, \
-             patch.object(course.logging, "error"):
+        with patch.object(course.logging, "error"), \
+             patch("builtins.print"):
             result = manager.complete_exam("course-packet-id")
 
         self.assertFalse(result)
-        get_exam_info.assert_not_called()
-        manager.get_exam_answers.assert_called_once()
-        self.assertEqual(manager.get_exam_answers.call_args.args[0], "8ad5bd4d9d483dde019e3e1066f60035")
+        manager.get_exam_info.assert_called_once_with("course-packet-id")
+        # 拿到动态 ID 后用它请求试卷
+        called_exam_id = manager.get_exam_answers.call_args.args[0]
+        self.assertEqual(called_exam_id, "dynamic-exam-id")
+
+    def test_complete_exam_falls_back_to_default_exam_id(self):
+        manager = course.CourseManager(Mock(), "token")
+        manager.get_exam_answers = Mock(return_value=None)
+        manager.get_exam_info = Mock(return_value=None)
+
+        with patch.object(course.logging, "error"), \
+             patch.object(course, "DEFAULT_EXAM_ID", "fallback-id"), \
+             patch("builtins.print"):
+            result = manager.complete_exam("course-packet-id")
+
+        self.assertFalse(result)
+        manager.get_exam_info.assert_called_once_with("course-packet-id")
+        # 动态获取失败时回退到默认考试 ID
+        called_exam_id = manager.get_exam_answers.call_args.args[0]
+        self.assertEqual(called_exam_id, "fallback-id")
 
 
 if __name__ == "__main__":

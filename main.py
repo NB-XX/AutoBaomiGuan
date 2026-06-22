@@ -1,7 +1,6 @@
-import requests
 import time
 import logging
-import json 
+import json
 import os
 from colorama import init, Fore, Style
 import login
@@ -16,18 +15,12 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 CREDENTIALS_FILE = 'credentials.json'
 CURRENT_COURSE_PACKET_ID = '312bc914-8e11-421b-b9bc-e900fe1a4e50'
 
-# 创建会话
-session = requests.Session()
+# 创建会话（复用 login 模块的共享会话）
+session = login.session
 
 def get_headers(token):
     """返回带有当前token的headers"""
-    return {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/95.0.4638.69 Safari/537.36',
-        'token': token,
-        'authToken': token,
-        'siteId': '95',
-        'Content-Type': 'application/json'
-    }
+    return login.build_headers(token)
 
 def save_credentials(loginName, passWord, token):
     """保存用户凭证到本地文件"""
@@ -131,56 +124,43 @@ def get_user_credentials():
 def display_course_menu():
     """显示课程管理菜单"""
     print(f"\n{Fore.CYAN}============ 课程管理菜单 ============{Style.RESET_ALL}")
-    print(f"{Fore.YELLOW}1. 查看课程目录{Style.RESET_ALL}")
-    print(f"{Fore.YELLOW}2. 查看课程进度{Style.RESET_ALL}")
-    print(f"{Fore.YELLOW}3. 开始学习课程{Style.RESET_ALL}")
-    print(f"{Fore.YELLOW}4. 完成课程考试{Style.RESET_ALL}")
+    print(f"{Fore.YELLOW}1. 一键完成学习与考试{Style.RESET_ALL}")
+    print(f"{Fore.YELLOW}2. 开始学习课程{Style.RESET_ALL}")
+    print(f"{Fore.YELLOW}3. 开始进行考试{Style.RESET_ALL}")
     print(f"{Fore.YELLOW}0. 退出程序{Style.RESET_ALL}")
-    choice = input(f"\n{Fore.CYAN}请选择操作 (0-4): {Style.RESET_ALL}")
+    choice = input(f"\n{Fore.CYAN}请选择操作 (0-3): {Style.RESET_ALL}")
     return choice
 
 def handle_course_menu(course_manager):
     """处理课程管理菜单选择"""
     while True:
         choice = display_course_menu()
-        
+
         if choice == '0':
             print(f"\n{Fore.GREEN}感谢使用，再见！{Style.RESET_ALL}")
             break
         elif choice == '1':
-            # 获取课程目录
-            course_info = course_manager.get_course_info(CURRENT_COURSE_PACKET_ID)
-            if course_info and course_info.get('data'):
-                print(f"\n{Fore.GREEN}当前课程: {course_info['data']['name']}{Style.RESET_ALL}")
-                print(f"课程说明: {course_info['data']['note']}")
-                
-                directory = course_manager.get_course_directory(CURRENT_COURSE_PACKET_ID)
-                if directory and directory.get('data'):
-                    print(f"\n{Fore.CYAN}课程目录:{Style.RESET_ALL}")
-                    for section in directory['data']:
-                        print(f"\n{Fore.YELLOW}{section['name']}{Style.RESET_ALL}")
-                        for sub in section['subDirectory']:
-                            print(f"  - {sub['name']}")
+            # 一键完成学习与考试
+            print(f"\n{Fore.CYAN}开始一键完成学习与考试...{Style.RESET_ALL}")
+            study_ok = course_manager.study_course(CURRENT_COURSE_PACKET_ID)
+            if study_ok:
+                print(f"\n{Fore.GREEN}课程学习完成！{Style.RESET_ALL}")
+            else:
+                print(f"\n{Fore.RED}课程学习失败，请稍后重试{Style.RESET_ALL}")
+
+            print(f"\n{Fore.CYAN}开始自动完成考试...{Style.RESET_ALL}")
+            if course_manager.complete_exam(CURRENT_COURSE_PACKET_ID):
+                print(f"\n{Fore.GREEN}考试完成！{Style.RESET_ALL}")
+            else:
+                print(f"\n{Fore.RED}考试完成失败，请稍后重试{Style.RESET_ALL}")
         elif choice == '2':
-            # 查看课程进度
-            progress = course_manager.get_course_progress(CURRENT_COURSE_PACKET_ID)
-            if progress and progress.get('data'):
-                data = progress['data']
-                print(f"\n{Fore.CYAN}课程进度信息:{Style.RESET_ALL}")
-                print(f"课程名称: {data['courseName']}")
-                print(f"学习进度: {data['progressRate']*100:.1f}%")
-                print(f"已学课程数: {data['studyResourceNum']}/{data['resourceSum']}")
-                print(f"总学习时长: {data['totalStudyTime']}秒")
-                print(f"是否完成: {'是' if data['isFinish'] else '否'}")
-                print(f"是否获得证书: {'是' if data['isCertificate'] else '否'}")
-        elif choice == '3':
             # 开始自动学习课程
             print(f"\n{Fore.CYAN}开始自动学习课程...{Style.RESET_ALL}")
             if course_manager.study_course(CURRENT_COURSE_PACKET_ID):
                 print(f"\n{Fore.GREEN}课程学习完成！{Style.RESET_ALL}")
             else:
                 print(f"\n{Fore.RED}课程学习失败，请稍后重试{Style.RESET_ALL}")
-        elif choice == '4':
+        elif choice == '3':
             # 开始自动完成考试
             print(f"\n{Fore.CYAN}开始自动完成考试...{Style.RESET_ALL}")
             if course_manager.complete_exam(CURRENT_COURSE_PACKET_ID):

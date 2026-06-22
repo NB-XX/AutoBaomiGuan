@@ -28,5 +28,18 @@ Thumbs.db
 *.sqlite
 *.db
 
+# --- 编辑器/IDE ---
 /.vscode/
+/.idea/
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# --- 打包产物 ---
+build.spec
+*.spec
+
+# --- 本地凭证与工具状态（切勿上传）---
 credentials.json
+.omc/
